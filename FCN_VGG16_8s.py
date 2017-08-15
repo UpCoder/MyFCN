@@ -39,8 +39,18 @@ CONV5_2_DEEP = 512
 CONV5_3_SIZE = 1
 CONV5_3_DEEP = 512
 
-UPSAMPLE1_1_SIZE = 5
+UPSAMPLE1_1_SIZE = 4
 UPSAMPLE1_1_DEEP = 150
+
+UPSAMPLE2_1_SIZE = 4
+UPSAMPLE2_1_DEEP = CONV4_3_DEEP
+UPSAMPLE2_2_SIZE = 4
+UPSAMPLE2_2_DEEP = 150
+
+UPSAMPLE3_1_SIZE = 16
+UPSAMPLE3_1_DEEP = CONV3_3_DEEP
+UPSAMPLE3_2_SIZE = 16
+UPSAMPLE3_2_DEEP = 150
 
 
 FC1_SIZE = 1
@@ -303,7 +313,7 @@ def inference(image, keep_prob):
                 ksize=[1, 2, 2, 1]
             )
             print pooling5.shape
-        with tf.variable_scope('upsampe1'):
+        with tf.variable_scope('upsample_32s'):
             weight = tf.get_variable(
                 'weight',
                 shape=[
@@ -314,14 +324,88 @@ def inference(image, keep_prob):
                 ],
                 initializer=tf.truncated_normal_initializer(stddev=0.02)
             )
-            upsample1 = tf.nn.conv2d_transpose(
+            upsample_32s = tf.nn.conv2d_transpose(
                 pooling5,
                 weight,
                 output_shape=[FLAGS.batch_size, IMAGE_SIZE, IMAGE_SIZE, UPSAMPLE1_1_DEEP],
                 strides=[1, 32, 32, 1]
             )
-            print 'upsample1 shape is ', upsample1.shape
-        return upsample1
+            print 'upsampe32s shape is ', upsample_32s.shape
+        global upsample_16s_input
+        upsample_16s_input = None
+        with tf.variable_scope('upsample_16s'):
+            weight = tf.get_variable(
+                'upsample_16s_weight',
+                shape=[
+                    UPSAMPLE2_1_SIZE,
+                    UPSAMPLE2_1_SIZE,
+                    UPSAMPLE2_1_DEEP,
+                    CONV5_3_DEEP
+                ]
+            )
+            upsample2x = tf.nn.conv2d_transpose(
+                pooling5,
+                weight,
+                output_shape=[FLAGS.batch_size, IMAGE_SIZE/16, IMAGE_SIZE/16, UPSAMPLE2_1_DEEP],
+                strides=[1, 2, 2, 1]
+            )
+            upsample_16s_input = upsample2x + pooling4
+            weight2 = tf.get_variable(
+                'upsample_16s_weight2',
+                shape=[
+                    UPSAMPLE2_2_SIZE,
+                    UPSAMPLE2_2_SIZE,
+                    UPSAMPLE2_2_DEEP,
+                    UPSAMPLE2_1_DEEP
+                ],
+                initializer=tf.truncated_normal_initializer(stddev=0.02)
+            )
+            upsample_16s = tf.nn.conv2d_transpose(
+                upsample_16s_input,
+                weight2,
+                output_shape=[FLAGS.batch_size, IMAGE_SIZE, IMAGE_SIZE, UPSAMPLE2_2_DEEP],
+                strides=[1, 16, 16, 1]
+            )
+            print 'upsample_16s shape is ', upsample_16s.shape
+        with tf.variable_scope('upsample_8s'):
+            if upsample_16s_input is None:
+                print 'upsample 16s input is None'
+                return upsample_16s
+            weight = tf.get_variable(
+                'weight1',
+                shape=[
+                    UPSAMPLE3_1_SIZE,
+                    UPSAMPLE3_1_SIZE,
+                    UPSAMPLE3_1_DEEP,
+                    CONV4_3_DEEP
+                ]
+            )
+            print 'upsample 16s input shape is ', upsample_16s_input.shape
+            print 'weight shape is ', weight.shape
+            upsample2x = tf.nn.conv2d_transpose(
+                upsample_16s_input,
+                weight,
+                output_shape=[FLAGS.batch_size, IMAGE_SIZE / 8, IMAGE_SIZE / 8, UPSAMPLE3_1_DEEP],
+                strides=[1, 2, 2, 1]
+            )
+            upsample_8s_input = upsample2x + pooling3
+            weight2 = tf.get_variable(
+                'weight2',
+                shape=[
+                    UPSAMPLE3_2_SIZE,
+                    UPSAMPLE3_2_SIZE,
+                    UPSAMPLE3_2_DEEP,
+                    UPSAMPLE3_1_DEEP
+                ],
+                initializer=tf.truncated_normal_initializer(stddev=0.02)
+            )
+            upsample_8s = tf.nn.conv2d_transpose(
+                upsample_8s_input,
+                weight2,
+                output_shape=[FLAGS.batch_size, IMAGE_SIZE, IMAGE_SIZE, UPSAMPLE3_2_DEEP],
+                strides=[1, 8, 8, 1]
+            )
+        return upsample_8s
 
 
 def compare2onedimension(x):
@@ -408,7 +492,7 @@ def train(dataset):
     learning_rate = tf.train.exponential_decay(
         learning_rate=FLAGS.learning_rate,
         global_step=global_step,
-        decay_steps=20,
+        decay_steps=1,
         decay_rate=DECAY_LEARNING_RATE,
         staircase=True
     )
