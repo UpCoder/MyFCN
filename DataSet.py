@@ -12,10 +12,10 @@ class DataSet:
         self.data_dir = data_dir
         self.image_size = image_size
         self.debug = True
-        train_image_npy_path = './data/train_image.npy'
-        train_annotation_npy_path = './data/train_annotation.npy'
-        validation_image_npy_path = './data/validation_image.npy'
-        validation_annotation_npy_path = './data/validation_annotation.npy'
+        train_image_npy_path = '/home/give/PycharmProjects/MyFCN/data/train_image.npy'
+        train_annotation_npy_path = '/home/give/PycharmProjects/MyFCN/data/train_annotation.npy'
+        validation_image_npy_path = '/home/give/PycharmProjects/MyFCN/data/validation_image.npy'
+        validation_annotation_npy_path = '/home/give/PycharmProjects/MyFCN/data/validation_annotation.npy'
         if os.path.exists(train_image_npy_path):
             self.train_image = np.load(train_image_npy_path)
             self.train_annotation = np.load(train_annotation_npy_path)
